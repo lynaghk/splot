@@ -12,12 +12,13 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // See https://github.com/leeoniya/uPlot/tree/master/docs
-    let plot_opts = r##"
+    let config = Config {
+        // See https://github.com/leeoniya/uPlot/tree/master/docs
+        plot: r##"
 {
   title: "My Chart",
-  width: 800,
-  height: 600,
+  width: document.body.clientWidth,
+  height: Math.min(document.body.clientHeight - 100, 600),
   series: [
     {time: false},
     {
@@ -37,9 +38,19 @@ async fn main() {
   axes: [{},
          {size: 70}]
 }
-"##;
+"##
+        .into(),
 
-    let plotter = PlotterHandle::<2>::new(plot_opts);
+        css: r##"
+.uplot {
+  font-family: monospace;
+  margin: auto;
+}
+"##
+        .into(),
+    };
+
+    let plotter = PlotterHandle::<2>::new(&config);
 
     //Update the data every 10ms
     tokio::spawn({

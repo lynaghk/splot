@@ -1,5 +1,4 @@
-// Note, ALL_CAPS variables will be interpolated in by webserver.
-
+// Note, ALL_CAPS variables will be interpolated at Rust compile-time.
 
 // make ReadableStream async iterable;
 // https://bugs.chromium.org/p/chromium/issues/detail?id=929585
@@ -23,8 +22,6 @@ async function stream_floats(path, on_float, on_chunk) {
 
   let remainder = new Uint8Array(0);
   for await (const chunk of res.body) {
-    // console.log(chunk.buffer.byteLength);
-
     // handle previous remainder, if any
     let offset = (8 - remainder.length) % 8;
     if (0 != offset) {

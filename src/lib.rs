@@ -1,5 +1,5 @@
 pub mod prelude {
-    pub use crate::PlotterHandle;
+    pub use crate::{Config, PlotterHandle};
 }
 
 use async_stream::stream;
@@ -78,12 +78,13 @@ struct Plotter<const N: usize> {
 }
 
 impl<const N: usize> Plotter<N> {
-    fn new(plot_opts: &str) -> Self {
+    fn new(config: &Config) -> Self {
         let (tx, _) = tokio::sync::broadcast::channel(16);
 
         // HTML templating, lol
         let page = include_str!("index.html")
             .replace("UPLOT_CSS", include_str!("../vendor/uplot.css"))
+            .replace("USER_CSS", &config.css)
             .replace(
                 "GENERATED_JS",
                 &format!(
@@ -91,7 +92,7 @@ impl<const N: usize> Plotter<N> {
                     include_str!("../vendor/uplot.js"),
                     include_str!("main.js")
                         .replace("N_SERIES", &format!("{}", N))
-                        .replace("PLOT_OPTS", plot_opts)
+                        .replace("PLOT_OPTS", &config.plot)
                 ),
             );
 
@@ -117,11 +118,17 @@ impl<const N: usize> Plotter<N> {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct Config {
+    pub plot: String,
+    pub css: String,
+}
+
 #[derive(Clone)]
 pub struct PlotterHandle<const N: usize>(Arc<RwLock<Plotter<N>>>);
 impl<const N: usize> PlotterHandle<N> {
-    pub fn new(plot_opts: &str) -> Self {
-        Self(Arc::new(RwLock::new(Plotter::<N>::new(plot_opts))))
+    pub fn new(config: &Config) -> Self {
+        Self(Arc::new(RwLock::new(Plotter::<N>::new(config))))
     }
 
     pub fn push(&mut self, v: [f64; N]) {

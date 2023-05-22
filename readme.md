@@ -18,7 +18,6 @@ The [demo](examples/demo.rs) can be run via:
 
 - Rust API rather than inlining JS config
 - "easy mode" (hide async and threads complexity --- possible to do in one or two lines only?)
-- charts should size to browser width
 - don't reset zoom/interaction when new data arrives
 - ? configurable circular buffers so plots can stream indefinitely without memory leaks
 - auto-reconnect when HTTP connection closes (would need to reload entire page, in case plot config has changed => simple live-reloading)
