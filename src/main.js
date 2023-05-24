@@ -42,6 +42,19 @@ async function stream_floats(path, on_float, on_chunk) {
   }
 }
 
+// on any error, just keep trying to reload the page
+async function on_error(e){
+  while (true) {
+    try {
+      await fetch(location.href);
+      location.reload();
+      break;
+    } catch (_) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+}
+
 async function main(){
   // TODO: preallocate array with "missing" value (NaN?)
   let data = new Array(N_SERIES);
@@ -64,8 +77,12 @@ async function main(){
     }
   }
 
+
+
+
   const on_chunk = () => uplot.setData(data);
-  stream_floats("/data", on_float, on_chunk);
+  stream_floats("/data", on_float, on_chunk).catch(on_error);
+
 }
 
 
