@@ -140,6 +140,14 @@ impl<const N: usize> PlotterHandle<N> {
         let app = make_routes(self);
         serve(app, port).await
     }
+
+    pub fn serve_blocking(self, port: u16) {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async { self.serve(port).await })
+    }
 }
 
 // TODO: Rust API.

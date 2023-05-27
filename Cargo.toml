@@ -10,6 +10,7 @@ tokio = { version = "1", features = ["macros"] }
 async-stream = "0.3"
 
 [dev-dependencies]
+env_logger = "*"
 tokio = { version = "1", features = ["macros", "rt"] }
 tracing = "0.1"
 tracing-subscriber = { version ="0.3.9", features = ["env-filter"] }
