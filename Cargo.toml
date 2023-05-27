@@ -4,17 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1"
-
-axum = { git = "https://github.com/tokio-rs/axum", features = ["http2"] }
+log = "0.4"
+axum = { git = "https://github.com/tokio-rs/axum" }
 tokio = { version = "1", features = ["macros"] }
-tower = { version = "0.4", features = ["util"] }
 async-stream = "0.3"
-futures-util = "*"
-
-tracing = "0.1"
-tracing-subscriber = { version ="0.3.9", features = ["env-filter"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
+tracing = "0.1"
+tracing-subscriber = { version ="0.3.9", features = ["env-filter"] }

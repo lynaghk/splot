@@ -13,7 +13,8 @@ use axum::{
     Router,
 };
 
-//use serde::{Deserialize, Serialize};
+use log::*;
+
 use std::{
     net::SocketAddr,
     sync::{Arc, RwLock},
@@ -66,7 +67,7 @@ fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
 async fn serve(app: Router, port: u16) {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    tracing::debug!("listening on {}", listener.local_addr().unwrap());
+    info!("splot listening on {}", listener.local_addr().unwrap());
     // TODO: switch this to http2, which will also require figuring out certs so browsers will actually use it.
     axum::serve(listener, app).await.unwrap();
 }
