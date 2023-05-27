@@ -56,5 +56,5 @@ pub fn main() {
         }
     });
 
-    plotter.serve_blocking(3004)
+    plotter.serve_blocking("0.0.0.0:3004")
 }

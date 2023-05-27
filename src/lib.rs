@@ -15,11 +15,8 @@ use axum::{
 
 use log::*;
 
-use std::{
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-};
-use tokio::sync::broadcast::Sender;
+use std::sync::{Arc, RwLock};
+use tokio::{net::ToSocketAddrs, sync::broadcast::Sender};
 
 fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
     async fn handle_404() -> (StatusCode, &'static str) {
@@ -64,8 +61,7 @@ fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
         .fallback_service(handle_404.into_service())
 }
 
-async fn serve(app: Router, port: u16) {
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+async fn serve<A: ToSocketAddrs>(app: Router, addr: A) {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     info!("splot listening on {}", listener.local_addr().unwrap());
     // TODO: switch this to http2, which will also require figuring out certs so browsers will actually use it.
@@ -136,17 +132,17 @@ impl<const N: usize> PlotterHandle<N> {
         self.0.write().unwrap().push(v);
     }
 
-    pub async fn serve(self, port: u16) {
+    pub async fn serve<A: ToSocketAddrs>(self, addr: A) {
         let app = make_routes(self);
-        serve(app, port).await
+        serve(app, addr).await
     }
 
-    pub fn serve_blocking(self, port: u16) {
+    pub fn serve_blocking<A: ToSocketAddrs>(self, addr: A) {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        rt.block_on(async { self.serve(port).await })
+        rt.block_on(async { self.serve(addr).await })
     }
 }
 

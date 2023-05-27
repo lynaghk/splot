@@ -64,5 +64,5 @@ async fn main() {
         }
     });
 
-    plotter.serve(3004).await
+    plotter.serve("0.0.0.0:3004").await
 }
