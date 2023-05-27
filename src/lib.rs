@@ -28,20 +28,19 @@ fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
         plotter: PlotterHandle<N>,
     }
 
-    async fn stream_body<const N: usize>(
+    async fn stream_data<const N: usize>(
         State(state): State<AppState<N>>,
     ) -> impl axum::response::IntoResponse {
-        // Need an error type so Body::from_stream works
-        type MyError = Result<Bytes, std::io::Error>;
         let (v, mut rx) = {
             let snapshot = state.plotter.0.read().unwrap();
-
-            // need to subscribe to the broadcast channel while snapshot is locked so that we don't miss any updates.
-            let rx = snapshot.tx.subscribe();
-            (snapshot.serialize(), rx)
+            // Subscribe to the broadcast channel while snapshot is locked so that we don't miss any updates.
+            let rx = snapshot.data.tx.subscribe();
+            (snapshot.data.serialize(), rx)
         };
 
         let s = stream! {
+            // Define an error to satisfy the typechecker.
+            type MyError = Result<Bytes, std::io::Error>;
             yield MyError::Ok(v.into());
             while let Ok(x) = rx.recv().await {
                 yield Ok(x)
@@ -50,11 +49,11 @@ fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
         Body::from_stream(s)
     }
 
-    let page = plotter.0.read().unwrap().page.clone();
+    let page = plotter.0.read().unwrap().html_page.clone();
 
     Router::new()
         .route("/", get(|| async { Html(page) }))
-        .route("/data", get(stream_body))
+        .route("/data", get(stream_data))
         .with_state(AppState {
             plotter: plotter.clone(),
         })
@@ -68,18 +67,48 @@ async fn serve<A: ToSocketAddrs>(app: Router, addr: A) {
     axum::serve(listener, app).await.unwrap();
 }
 
-struct Plotter<const N: usize> {
+struct StreamableStorage {
     tx: Sender<Bytes>,
-    data: Vec<[f64; N]>,
-    page: String,
+    data: Vec<u8>,
+}
+
+impl StreamableStorage {
+    fn new() -> Self {
+        let (tx, _) = tokio::sync::broadcast::channel(16);
+        Self { data: vec![], tx }
+    }
+
+    fn push<T: IntoBytes>(&mut self, x: T) {
+        let bs = x.into_bytes();
+        self.data.extend_from_slice(&bs[..]);
+        let _ = self.tx.send(bs);
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        //TODO: this should probably return Bytes so we're not cloning the entire history everytime a new client connects.
+        self.data.clone()
+    }
+}
+
+trait IntoBytes {
+    fn into_bytes(self) -> Bytes;
+}
+
+impl<const N: usize> IntoBytes for [f64; N] {
+    fn into_bytes(self) -> Bytes {
+        self.iter().flat_map(|y| y.to_be_bytes()).collect()
+    }
+}
+
+struct Plotter<const N: usize> {
+    data: StreamableStorage,
+    html_page: String,
 }
 
 impl<const N: usize> Plotter<N> {
     fn new(config: &Config) -> Self {
-        let (tx, _) = tokio::sync::broadcast::channel(16);
-
         // HTML templating, lol
-        let page = include_str!("index.html")
+        let html_page = include_str!("index.html")
             .replace("UPLOT_CSS", include_str!("../vendor/uplot.css"))
             .replace("USER_CSS", &config.css)
             .replace(
@@ -94,24 +123,13 @@ impl<const N: usize> Plotter<N> {
             );
 
         Self {
-            tx,
-            data: Vec::new(),
-            page,
+            data: StreamableStorage::new(),
+            html_page,
         }
     }
 
     fn push(&mut self, v: [f64; N]) {
         self.data.push(v);
-        let _ = self
-            .tx
-            .send(v.iter().flat_map(|y| y.to_be_bytes()).collect());
-    }
-
-    fn serialize(&self) -> Vec<u8> {
-        self.data
-            .iter()
-            .flat_map(|x| x.iter().flat_map(|y| y.to_be_bytes()))
-            .collect()
     }
 }
 
