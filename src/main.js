@@ -42,6 +42,15 @@ async function stream_floats(path, on_float, on_chunk) {
   }
 }
 
+
+async function stream_text(path, on_chunk) {
+  let res = await fetch(path);
+  for await (const chunk of res.body.pipeThrough(new TextDecoderStream())) {
+    on_chunk(chunk);
+  }
+}
+
+
 // on any error, just keep trying to reload the page
 async function on_error(e){
   while (true) {
@@ -62,7 +71,7 @@ async function main(){
     data[i] = [];
   }
 
-  let uplot = new uPlot(PLOT_OPTS, data, document.body);
+  let uplot = new uPlot(PLOT_OPTS, data, window.splot_chart);
 
   let n = 0; // number of samples
   let j = 0;
@@ -77,12 +86,9 @@ async function main(){
     }
   }
 
-
-
-
   const on_chunk = () => uplot.setData(data);
   stream_floats("/data", on_float, on_chunk).catch(on_error);
-
+  stream_text("/text", (t) => { window.splot_text.innerText += t }).catch(on_error);
 }
 
 

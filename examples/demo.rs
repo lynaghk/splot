@@ -56,5 +56,18 @@ pub fn main() {
         }
     });
 
+    // Update the text every 100ms
+    std::thread::spawn({
+        let mut plotter = plotter.clone();
+        move || {
+            let mut n = 0;
+            loop {
+                plotter.push_text(format!("Log line number: {n}\n"));
+                n += 1;
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    });
+
     plotter.serve_blocking("0.0.0.0:3004")
 }

@@ -49,11 +49,34 @@ fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
         Body::from_stream(s)
     }
 
+    // TODO: eliminate this copy/paste somehow.
+    async fn stream_text<const N: usize>(
+        State(state): State<AppState<N>>,
+    ) -> impl axum::response::IntoResponse {
+        let (v, mut rx) = {
+            let snapshot = state.plotter.0.read().unwrap();
+            // Subscribe to the broadcast channel while snapshot is locked so that we don't miss any updates.
+            let rx = snapshot.text.tx.subscribe();
+            (snapshot.text.serialize(), rx)
+        };
+
+        let s = stream! {
+            // Define an error to satisfy the typechecker.
+            type MyError = Result<Bytes, std::io::Error>;
+            yield MyError::Ok(v.into());
+            while let Ok(x) = rx.recv().await {
+                yield Ok(x)
+            };
+        };
+        Body::from_stream(s)
+    }
+
     let page = plotter.0.read().unwrap().html_page.clone();
 
     Router::new()
         .route("/", get(|| async { Html(page) }))
         .route("/data", get(stream_data))
+        .route("/text", get(stream_text))
         .with_state(AppState {
             plotter: plotter.clone(),
         })
@@ -100,8 +123,15 @@ impl<const N: usize> IntoBytes for [f64; N] {
     }
 }
 
+impl IntoBytes for String {
+    fn into_bytes(self) -> Bytes {
+        self.into()
+    }
+}
+
 struct Plotter<const N: usize> {
     data: StreamableStorage,
+    text: StreamableStorage,
     html_page: String,
 }
 
@@ -124,12 +154,17 @@ impl<const N: usize> Plotter<N> {
 
         Self {
             data: StreamableStorage::new(),
+            text: StreamableStorage::new(),
             html_page,
         }
     }
 
     fn push(&mut self, v: [f64; N]) {
         self.data.push(v);
+    }
+
+    fn push_text(&mut self, v: String) {
+        self.text.push(v);
     }
 }
 
@@ -148,6 +183,10 @@ impl<const N: usize> PlotterHandle<N> {
 
     pub fn push(&mut self, v: [f64; N]) {
         self.0.write().unwrap().push(v);
+    }
+
+    pub fn push_text(&mut self, v: String) {
+        self.0.write().unwrap().push_text(v);
     }
 
     pub async fn serve<A: ToSocketAddrs>(self, addr: A) {
