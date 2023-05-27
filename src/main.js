@@ -17,6 +17,23 @@ ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
 }
 
 
+function split_stream(delimiter) {
+  let buffer = "";
+
+  return new TransformStream({
+    transform(chunk, controller) {
+      buffer += chunk;
+      const parts = buffer.split(delimiter);
+      parts.slice(0, -1).forEach(part => controller.enqueue(part));
+      buffer = parts[parts.length - 1];
+    },
+    flush(controller) {
+      if (buffer) controller.enqueue(buffer);
+    }
+  });
+}
+
+
 async function stream_floats(path, on_float, on_chunk) {
   let res = await fetch(path);
 
@@ -43,10 +60,10 @@ async function stream_floats(path, on_float, on_chunk) {
 }
 
 
-async function stream_text(path, on_chunk) {
+async function stream_text(path, on_line) {
   let res = await fetch(path);
-  for await (const chunk of res.body.pipeThrough(new TextDecoderStream())) {
-    on_chunk(chunk);
+  for await (const line of res.body.pipeThrough(new TextDecoderStream()).pipeThrough(split_stream("\n"))) {
+    on_line(line);
   }
 }
 
@@ -88,7 +105,7 @@ async function main(){
 
   const on_chunk = () => uplot.setData(data);
   stream_floats("/data", on_float, on_chunk).catch(on_error);
-  stream_text("/text", (t) => { window.splot_text.innerText += t }).catch(on_error);
+  stream_text("/text", (line) => { window.splot_text.innerText = line + "\n" + window.splot_text.innerText }).catch(on_error);
 }
 
 
