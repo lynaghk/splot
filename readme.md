@@ -1,29 +1,39 @@
 # Streaming plots
 
-Work-in-progress.
+A quick and easy way to add low-latency time series plots and browser-accessible logs to Rust applications.
 
-Low-latency time series plot --- streams binary data from server over persistent HTTP connection.
-
-Priorities:
-
-- quick/easy to use (like `println`)
-- low resource usage both ends (raspberry pi servers; old android tablet clients)
-
-The [demo](examples/demo.rs) can be run via:
+Run the [demo](examples/demo.rs) via and navigate to http://localhost:3004/
 
     cargo run --example demo
 
 
+## Priorities
+
+- ease of use approaching `println`
+- low resource usage both ends (suitable for Raspberry Pi servers and old phone/tablet clients)
+
+
+## Non-priorities
+
+- API stability; add to your project's `Cargo.toml` as `splot = { git = "https://github.com/lynaghk/splot", rev = "< SHA of commit you've reviewed here >" }
+- other plot types
+
+
 ## TODO
 
-- Rust API rather than inlining JS config
-- "easy mode" (hide async and threads complexity --- possible to do in one or two lines only?)
+Roughly in descending priority order:
+
+- constrain memory usage on both ends so plots can stream indefinitely and with known overhead
+- example of redirecting logging
+- add Raspberry Pi usage example
 - don't reset zoom/interaction when new data arrives
-- ? configurable circular buffers so plots can stream indefinitely without memory leaks
-- auto-reconnect when HTTP connection closes (would need to reload entire page, in case plot config has changed => simple live-reloading)
+- optimize streaming implementation
+  - can probably do some kind of high-water-mark per connection and shared Vec, rather than passing new data across channels (unnecessary copies and memory usage)
+  - don't clone entire dataset when new client connects
+- add esp32 usage example (likely requires alternative HTTP server implementation)
+- Rust API rather than inlining uPlot config as JS
 - characterize disconnect/reconnect behavior when no updates (can we rely on browser/networking stack to heartbeat, or does this need to happen at application level?)
-- compare current HTTP streaming approach with websockets (PRs welcome =P)
-- optimize HTTP streaming updates further --- can probably do some kind of high-water-mark per connection and use shared Vec, rather than passing new data across channels (unnecessary copies and memory usage)
+- compare current HTTP streaming approach with websockets (PRs welcome)
 
 
 ## notes on alternative plotting libs
