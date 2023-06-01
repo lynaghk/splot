@@ -1,6 +1,7 @@
 pub mod prelude {
     pub use crate::{Config, PlotterHandle};
 }
+mod buffer;
 
 use async_stream::stream;
 use axum::{
@@ -15,8 +16,9 @@ use axum::{
 
 use log::*;
 
-use std::sync::{Arc, RwLock};
-use tokio::{net::ToSocketAddrs, sync::broadcast::Sender};
+use std::sync::Arc;
+use tokio::net::ToSocketAddrs;
+use tokio::sync::RwLock;
 
 fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
     async fn handle_404() -> (StatusCode, &'static str) {
@@ -28,24 +30,33 @@ fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
         plotter: PlotterHandle<N>,
     }
 
+    // Define an error to satisfy the typechecker.
+    type MyError = Result<Bytes, std::io::Error>;
+
     async fn stream_data<const N: usize>(
         State(state): State<AppState<N>>,
     ) -> impl axum::response::IntoResponse {
-        let (v, mut rx) = {
-            let snapshot = state.plotter.0.read().unwrap();
-            // Subscribe to the broadcast channel while snapshot is locked so that we don't miss any updates.
-            let rx = snapshot.data.tx.subscribe();
-            (snapshot.data.serialize(), rx)
+        let s = stream! {
+                let mut idx = state.plotter.0.data.read().await.bottom();
+                loop {
+                    let r = { state.plotter.0.data.read().await.get(idx) };
+                    match r {
+                        buffer::GetResult::Ok(x) => {
+                            yield MyError::Ok(x.into_bytes());
+                            idx += 1;
+                        }
+                        buffer::GetResult::Expired => {
+                            debug!("Slow consumer, closing connection");
+                            break;
+                        }
+                        buffer::GetResult::WaitUntil(notify) => {
+                            notify.notified().await;
+                            continue;
+                        }
+                    }
+                }
         };
 
-        let s = stream! {
-            // Define an error to satisfy the typechecker.
-            type MyError = Result<Bytes, std::io::Error>;
-            yield MyError::Ok(v.into());
-            while let Ok(x) = rx.recv().await {
-                yield Ok(x)
-            };
-        };
         Body::from_stream(s)
     }
 
@@ -53,25 +64,31 @@ fn make_routes<const N: usize>(plotter: PlotterHandle<N>) -> Router {
     async fn stream_text<const N: usize>(
         State(state): State<AppState<N>>,
     ) -> impl axum::response::IntoResponse {
-        let (v, mut rx) = {
-            let snapshot = state.plotter.0.read().unwrap();
-            // Subscribe to the broadcast channel while snapshot is locked so that we don't miss any updates.
-            let rx = snapshot.text.tx.subscribe();
-            (snapshot.text.serialize(), rx)
+        let s = stream! {
+                let mut idx = state.plotter.0.text.read().await.bottom();
+                loop {
+                    let r = { state.plotter.0.text.read().await.get(idx) };
+                    match r {
+                        buffer::GetResult::Ok(x) => {
+                            yield MyError::Ok(IntoBytes::into_bytes(x));
+                            idx += 1;
+                        }
+                        buffer::GetResult::Expired => {
+                            debug!("Slow consumer, closing connection");
+                            break;
+                        }
+                        buffer::GetResult::WaitUntil(notify) => {
+                            notify.notified().await;
+                            continue;
+                        }
+                    }
+                }
         };
 
-        let s = stream! {
-            // Define an error to satisfy the typechecker.
-            type MyError = Result<Bytes, std::io::Error>;
-            yield MyError::Ok(v.into());
-            while let Ok(x) = rx.recv().await {
-                yield Ok(x)
-            };
-        };
         Body::from_stream(s)
     }
 
-    let page = plotter.0.read().unwrap().html_page.clone();
+    let page = plotter.0.html_page.clone();
 
     Router::new()
         .route("/", get(|| async { Html(page) }))
@@ -88,29 +105,6 @@ async fn serve<A: ToSocketAddrs>(app: Router, addr: A) {
     info!("splot listening on {}", listener.local_addr().unwrap());
     // TODO: switch this to http2, which will also require figuring out certs so browsers will actually use it.
     axum::serve(listener, app).await.unwrap();
-}
-
-struct StreamableStorage {
-    tx: Sender<Bytes>,
-    data: Vec<u8>,
-}
-
-impl StreamableStorage {
-    fn new() -> Self {
-        let (tx, _) = tokio::sync::broadcast::channel(16);
-        Self { data: vec![], tx }
-    }
-
-    fn push<T: IntoBytes>(&mut self, x: T) {
-        let bs = x.into_bytes();
-        self.data.extend_from_slice(&bs[..]);
-        let _ = self.tx.send(bs);
-    }
-
-    fn serialize(&self) -> Vec<u8> {
-        //TODO: this should probably return Bytes so we're not cloning the entire history everytime a new client connects.
-        self.data.clone()
-    }
 }
 
 trait IntoBytes {
@@ -130,8 +124,9 @@ impl IntoBytes for String {
 }
 
 struct Plotter<const N: usize> {
-    data: StreamableStorage,
-    text: StreamableStorage,
+    // TODO: actually accept capacity as an argument...possible to use const generics without messing up all the type arguments?
+    data: RwLock<buffer::R<100, [f64; N]>>,
+    text: RwLock<buffer::R<100, String>>,
     html_page: String,
 }
 
@@ -153,18 +148,10 @@ impl<const N: usize> Plotter<N> {
             );
 
         Self {
-            data: StreamableStorage::new(),
-            text: StreamableStorage::new(),
+            data: RwLock::new(buffer::R::new([0.; N])),
+            text: RwLock::new(buffer::R::new("".to_string())),
             html_page,
         }
-    }
-
-    fn push(&mut self, v: [f64; N]) {
-        self.data.push(v);
-    }
-
-    fn push_text(&mut self, v: String) {
-        self.text.push(v);
     }
 }
 
@@ -175,18 +162,18 @@ pub struct Config {
 }
 
 #[derive(Clone)]
-pub struct PlotterHandle<const N: usize>(Arc<RwLock<Plotter<N>>>);
+pub struct PlotterHandle<const N: usize>(Arc<Plotter<N>>);
 impl<const N: usize> PlotterHandle<N> {
     pub fn new(config: &Config) -> Self {
-        Self(Arc::new(RwLock::new(Plotter::<N>::new(config))))
+        Self(Arc::new(Plotter::<N>::new(config)))
     }
 
     pub fn push(&mut self, v: [f64; N]) {
-        self.0.write().unwrap().push(v);
+        self.0.data.blocking_write().push(v);
     }
 
     pub fn push_text(&mut self, v: String) {
-        self.0.write().unwrap().push_text(v);
+        self.0.text.blocking_write().push(v);
     }
 
     pub async fn serve<A: ToSocketAddrs>(self, addr: A) {

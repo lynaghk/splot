@@ -23,7 +23,6 @@ Run the [demo](examples/demo.rs) via and navigate to http://localhost:3004/
 
 Roughly in descending priority order:
 
-- constrain memory usage on both ends so plots can stream indefinitely and with known overhead
 - example of redirecting logging
 - add Raspberry Pi usage example
 - don't reset zoom/interaction when new data arrives
