@@ -124,9 +124,8 @@ impl IntoBytes for String {
 }
 
 struct Plotter<const N: usize> {
-    // TODO: actually accept capacity as an argument...possible to use const generics without messing up all the type arguments?
-    data: RwLock<buffer::R<100, [f64; N]>>,
-    text: RwLock<buffer::R<100, String>>,
+    data: RwLock<buffer::R<[f64; N]>>,
+    text: RwLock<buffer::R<String>>,
     html_page: String,
 }
 
@@ -148,17 +147,19 @@ impl<const N: usize> Plotter<N> {
             );
 
         Self {
-            data: RwLock::new(buffer::R::new([0.; N])),
-            text: RwLock::new(buffer::R::new("".to_string())),
+            data: RwLock::new(buffer::R::new([0.; N], config.n_data)),
+            text: RwLock::new(buffer::R::new("".to_string(), config.n_text)),
             html_page,
         }
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Config {
     pub plot: String,
     pub css: String,
+    pub n_data: usize,
+    pub n_text: usize,
 }
 
 #[derive(Clone)]

@@ -1,9 +1,15 @@
 use splot::prelude::*;
 
 pub fn main() {
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var("RUST_LOG", "info");
+    }
     env_logger::init();
 
     let config = Config {
+        n_data: 10_000, // circular buffer of 10k data
+        n_text: 1_000,  // and 1k text lines
+
         // See https://github.com/leeoniya/uPlot/tree/master/docs
         plot: r##"
 {
@@ -41,7 +47,7 @@ pub fn main() {
         .into(),
     };
 
-    let plotter = PlotterHandle::<2>::new(&config);
+    let plotter = PlotterHandle::new(&config);
 
     // Update the data every 10ms
     std::thread::spawn({

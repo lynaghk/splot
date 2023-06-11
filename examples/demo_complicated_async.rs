@@ -3,6 +3,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var("RUST_LOG", "info");
+    }
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -12,6 +15,8 @@ async fn main() {
         .init();
 
     let config = Config {
+        n_data: 10_000, // circular buffer of 10k data
+        n_text: 1_000,  // and 1k text lines
         // See https://github.com/leeoniya/uPlot/tree/master/docs
         plot: r##"
 {
@@ -49,7 +54,7 @@ async fn main() {
         .into(),
     };
 
-    let plotter = PlotterHandle::<2>::new(&config);
+    let plotter = PlotterHandle::new(&config);
 
     //Update the data every 10ms
     tokio::spawn({

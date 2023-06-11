@@ -2,7 +2,9 @@ use std::sync::Arc;
 use tokio::sync::Notify;
 
 /// Ring buffer with monotonic index
-pub struct R<const N: usize, T> {
+pub struct R<T> {
+    /// number of items to store
+    n: usize,
     top: usize,
     v: Vec<T>, // TODO: replace with mut slice so consumers can provide their own buffer?
     notify: Arc<Notify>,
@@ -15,12 +17,13 @@ pub enum GetResult<T> {
     WaitUntil(Arc<Notify>),
 }
 
-impl<const N: usize, T: Clone> R<N, T> {
+impl<T: Clone> R<T> {
     // TODO: get rid of this default param and use MaybeUninit for the unobservable initial vector data
-    pub fn new(default: T) -> Self {
+    pub fn new(default: T, n: usize) -> Self {
         Self {
+            n,
             top: 0,
-            v: std::iter::repeat(default).take(N).collect(),
+            v: std::iter::repeat(default).take(n).collect(),
             notify: Arc::new(Notify::new()),
         }
     }
@@ -32,7 +35,7 @@ impl<const N: usize, T: Clone> R<N, T> {
         }
 
         if idx < self.top() {
-            return Ok(self.v[idx % N].clone());
+            return Ok(self.v[idx % self.n].clone());
         }
 
         return WaitUntil(self.notify.clone());
@@ -43,11 +46,11 @@ impl<const N: usize, T: Clone> R<N, T> {
     }
 
     pub fn bottom(&self) -> usize {
-        self.top.saturating_sub(N)
+        self.top.saturating_sub(self.n)
     }
 
     pub fn push(&mut self, x: T) {
-        self.v[self.top % N] = x;
+        self.v[self.top % self.n] = x;
         self.top += 1;
         self.notify.notify_waiters();
     }
