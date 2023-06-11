@@ -24,7 +24,7 @@ async fn main() {
   width: document.body.clientWidth,
   height: Math.min(document.body.clientHeight - 100, 600),
   series: [
-    {time: false},
+    {},
     {
       spanGaps: false,
 
@@ -62,7 +62,13 @@ async fn main() {
         async move {
             let mut n = 0;
             loop {
-                plotter.push_async([n as f64, (2 * n) as f64]).await;
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs_f64();
+
+                plotter.push_async([now, n as f64]).await;
                 n += 1;
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             }

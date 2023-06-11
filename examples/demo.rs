@@ -17,7 +17,7 @@ pub fn main() {
   width: document.body.clientWidth,
   height: Math.min(document.body.clientHeight - 100, 600),
   series: [
-    {time: false},
+    {},
     {
       spanGaps: false,
 
@@ -55,7 +55,13 @@ pub fn main() {
         move || {
             let mut n = 0;
             loop {
-                plotter.push([n as f64, (2 * n) as f64]);
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs_f64();
+
+                plotter.push([now, n as f64]);
                 n += 1;
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
