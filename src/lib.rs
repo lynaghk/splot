@@ -177,6 +177,14 @@ impl<const N: usize> PlotterHandle<N> {
         self.0.text.blocking_write().push(v);
     }
 
+    pub async fn push_async(&mut self, v: [f64; N]) {
+        self.0.data.write().await.push(v);
+    }
+
+    pub async fn push_text_async(&mut self, v: String) {
+        self.0.text.write().await.push(v);
+    }
+
     pub async fn serve<A: ToSocketAddrs>(self, addr: A) {
         let app = make_routes(self);
         serve(app, addr).await

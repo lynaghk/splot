@@ -62,7 +62,7 @@ async fn main() {
         async move {
             let mut n = 0;
             loop {
-                plotter.push([n as f64, (2 * n) as f64]);
+                plotter.push_async([n as f64, (2 * n) as f64]).await;
                 n += 1;
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             }
