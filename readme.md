@@ -26,9 +26,6 @@ Roughly in descending priority order:
 - example of redirecting logging
 - add Raspberry Pi usage example
 - don't reset zoom/interaction when new data arrives
-- optimize streaming implementation
-  - can probably do some kind of high-water-mark per connection and shared Vec, rather than passing new data across channels (unnecessary copies and memory usage)
-  - don't clone entire dataset when new client connects
 - add esp32 usage example (likely requires alternative HTTP server implementation)
 - Rust API rather than inlining uPlot config as JS
 - characterize disconnect/reconnect behavior when no updates (can we rely on browser/networking stack to heartbeat, or does this need to happen at application level?)
