@@ -15,8 +15,10 @@ Run the [demo](examples/demo.rs) via and navigate to http://localhost:3004/
 
 ## Non-priorities
 
-- API stability; add to your project's `Cargo.toml` as `splot = { git = "https://github.com/lynaghk/splot", rev = "< SHA of commit you've reviewed here >" }
 - other plot types
+- API stability; add to your project's `Cargo.toml` as:
+
+      splot = { git = "https://github.com/lynaghk/splot", rev = "< SHA of commit you've reviewed here >" }
 
 
 ## TODO
@@ -35,11 +37,11 @@ Roughly in descending priority order:
 ## notes on alternative plotting libs
 
 https://huww98.github.io/TimeChart/demo/
-11kB minified JS webgl chart using shadow DOM, looks tidy. 
+11kB minified JS webgl chart using shadow DOM, looks tidy.
 leans on d3 for SVG DOM scale, etc.
 can only use single-precision floats for, so data may need to be scaled before it can be rendered.
 first paint is 500ms faster for uPlot than TimeChart according to TimeChart author https://huww98.github.io/TimeChart/docs/performance
 
 https://github.com/plotters-rs/plotters-wasm-demo
-all rust drawing to canvas, no 
+all rust drawing to canvas, no
 80kB wasm blob
